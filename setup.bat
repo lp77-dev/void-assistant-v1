@@ -4,7 +4,7 @@ title VOID ASSISTANT - DEPLOYMENT SYSTEM
 color 0b
 
 echo ===================================================
-echo               VOID ASSISTANT (v1.0)
+echo                VOID ASSISTANT (v1.0)
 echo ===================================================
 
 :: 1. VERIFICACAO DO PYTHON
@@ -55,10 +55,10 @@ if exist "engine\void.brain" (
 
 echo.
 echo ===================================================
-echo               SELECAO DE NUCLEO
+echo                SELECAO DE NUCLEO
 echo ===================================================
 echo [1] Void-1-1B (Foco em Baixa Latencia - Mais Rapido e Leve)
-echo [2] Void-1-2B (Foco em Processamento Hibrido - Médio)
+echo [2] Void-1-2B (Foco em Processamento Hibrido - Medio)
 echo [3] Void-1-3B (Foco em Decisoes Criticas - Mais Inteligente)
 echo ===================================================
 set /p choice="INPUT SELECTION (1/2/3): "
@@ -82,10 +82,12 @@ if not exist "vosk-model" (
     echo [OK] Modulo Vosk detectado.
 )
 
-:: 7. VERIFICACAO DO CODIGO PRINCIPAL
+:: 7. VERIFICACAO DA ARQUITETURA E MEMORIA (ATUALIZADO)
 if not exist "engine\main.py" (
-    echo [*] Baixando Sistema Nervoso Central...
+    echo [*] Baixando Sistema Nervoso e Memorias Criptografadas...
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/main.py' -OutFile 'engine\main.py'" >nul 2>&1
+    powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/identity.void' -OutFile 'engine\identity.void'" >nul 2>&1
+    powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/commands.void' -OutFile 'engine\commands.void'" >nul 2>&1
 )
 
 :: 8. GERACAO DO LAUNCHER
