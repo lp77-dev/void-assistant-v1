@@ -8,7 +8,6 @@ import socket
 import subprocess
 from datetime import datetime
 
-# Tratamento de erro rigoroso para dependências de IA e Voz
 try:
     import pyttsx3
     from llama_cpp import Llama
@@ -17,7 +16,6 @@ except ImportError as e:
     input("Pressione Enter para sair...")
     sys.exit(1)
 
-# Blindagem para caracteres especiais (Ç, Á, Õ) no terminal do Windows
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if sys.stdin and hasattr(sys.stdin, 'reconfigure'):
@@ -87,9 +85,6 @@ def inicializar_voz():
         print(f"[!] Aviso: Modulo de voz falhou ao iniciar. Executando em modo silencioso. Erro: {e}")
         return None
 
-# ==========================================
-# BOOT SEQUENCE
-# ==========================================
 os.system('cls' if os.name == 'nt' else 'clear')
 print("===================================================")
 print("       LP77 ASSISTANT - NÚCLEO OPERACIONAL")
@@ -100,7 +95,6 @@ identity = decrypt_void("engine/identity.void")
 commands = decrypt_void("engine/commands.void")
 engine_voz = inicializar_voz()
 
-# Verificação do Motor (Cérebro)
 base_dir = get_base_path()
 model_path = os.path.join(base_dir, "engine", "void.brain")
 
@@ -147,7 +141,6 @@ while True:
                 engine_voz.say(txt)
                 engine_voz.runAndWait()
         else:
-            # Fallback se a IA não usar a tag <fala> corretamente
             clean_text = re.sub(r'<.*?>.*?</.*?>', '', response_raw).strip()
             if clean_text:
                 print(f"\nVOID: {clean_text}\n")
