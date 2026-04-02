@@ -1,3 +1,4 @@
+import sys
 import os
 import re
 import base64
@@ -8,6 +9,9 @@ import subprocess
 from datetime import datetime
 import pyttsx3
 from llama_cpp import Llama
+
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stdin.reconfigure(encoding='utf-8')
 
 def d(f_n):
     if not os.path.exists(f_n):
@@ -72,7 +76,7 @@ e = pyttsx3.init()
 l = Llama(model_path="engine/void.brain", n_ctx=2048)
 
 os.system('cls' if os.name == 'nt' else 'clear')
-print("[ VOID ASSISTANT ONLINE | LP77 ]")
+print("[ VOID ASSISTANT ONLINE | LP77 NATIVE ]")
 
 while True:
     c = input("\nLP77 > ")
@@ -93,7 +97,7 @@ while True:
         
     if x["p"]:
         print(f"\n[!] COMANDO PERIGOSO: {x['p']}")
-        if input("AUTORIZAR EXECUCAO? (S/N): ").upper() == 'S':
+        if input("AUTORIZAR EXECUCAO CRITICA? (S/N): ").upper() == 'S':
             os.system(x['p'])
     elif x["e"]:
         os.system(x['e'])
