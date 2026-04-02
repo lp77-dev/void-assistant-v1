@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal EnableDelayedExpansion
 title VOID ASSISTANT - DEPLOYMENT SYSTEM
 color 0b
@@ -7,20 +8,17 @@ echo ===================================================
 echo                VOID ASSISTANT (v1.0)
 echo ===================================================
 
-:: 1. CACA AO NUCLEO PYTHON (ANTI-LOOP INFINITO)
+:: 1. VEREFICANDO PYTHON
 set "PY_CMD="
 
-:: Tenta o comando padrao
 python --version >nul 2>&1
 if %errorlevel% equ 0 set "PY_CMD=python"
 
-:: Tenta o launcher 'py' (muito comum no Windows e que nao buga)
 if not defined PY_CMD (
     py --version >nul 2>&1
     if %errorlevel% equ 0 set "PY_CMD=py"
 )
 
-:: Cacada bruta nas pastas ocultas do Windows (Ignorando o PATH quebrado)
 if not defined PY_CMD (
     for /d %%i in ("%LocalAppData%\Programs\Python\Python3*") do (
         if exist "%%i\python.exe" set "PY_CMD=%%i\python.exe"
@@ -32,14 +30,13 @@ if not defined PY_CMD (
     )
 )
 
-:: Se o usuario realmente nao tem, instala forcando a configuracao do PATH
 if not defined PY_CMD (
-    echo [!] Python nao localizado no sistema.
+    echo [!] Python não localizado no sistema.
     echo [*] Baixando e configurando automaticamente (Aguarde)...
     winget install Python.Python.3.12 --silent --override "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0"
     echo.
     echo ===================================================
-    echo [OK] NUCLEO INSTALADO COM SUCESSO!
+    echo [OK] PYTHON INSTALADO COM SUCESSO!
     echo O Windows precisa de 1 segundo para processar.
     echo FECHE ESTA TELA E ABRA O SETUP NOVAMENTE.
     echo ===================================================
@@ -48,25 +45,22 @@ if not defined PY_CMD (
 )
 
 echo [OK] Motor Python localizado e validado.
-
-:: Limpa as aspas do caminho se ele foi achado nas pastas ocultas
 set PY_CMD=!PY_CMD:"=!
 
-:: 2. VERIFICACAO DO AMBIENTE ISOLADO (VENV)
+:: 2. VERIFICAÇÃO DO AMBIENTE (VENV)
 if not exist "venv" (
-    echo [*] Criando ambiente de contencao (VENV)...
+    echo [*] Criando ambiente de contenção (VENV)...
     "!PY_CMD!" -m venv venv
 ) else (
     echo [OK] VENV detectado.
 )
 
-:: A magica acontece aqui: Dentro do VENV, o comando 'python' SEMPRE funciona
 call venv\Scripts\activate
 
-:: 3. VERIFICACAO DE BIBLIOTECAS
+:: 3. VERIFICAÇÃO DE BIBLIOTECAS
 python -c "import llama_cpp, vosk, pyttsx3, psutil" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [*] Instalando dependencias pendentes...
+    echo [*] Instalando dependências pendentes...
     python -m pip install --upgrade pip >nul 2>&1
     pip install vosk pyttsx3 keyboard sounddevice scipy psutil llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu >nul 2>&1
 ) else (
@@ -75,25 +69,25 @@ if %errorlevel% neq 0 (
 
 if not exist "engine" mkdir engine
 
-:: 4. VERIFICACAO DA BASE DE DADOS
+:: 4. VERIFICAÇÃO DA BASE DE DADOS
 if not exist "engine.void" (
     echo [*] Baixando mapa de motores...
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine.void' -OutFile 'engine.void'" >nul 2>&1
 )
 
-:: 5. VERIFICACAO DO MOTOR
+:: 5. VERIFICAÇÃO DO MOTOR
 if exist "engine\void.brain" (
-    echo [OK] Motor ja instalado. Pulando download.
+    echo [OK] Motor já instalado. Pulando download.
     goto SKIP_ENGINE
 )
 
 echo.
 echo ===================================================
-echo                SELECAO DE NUCLEO
+echo                SELEÇÃO DE NÚCLEO
 echo ===================================================
-echo [1] Void-1-1B (Foco em Baixa Latencia - Mais Rapido e Leve)
-echo [2] Void-1-2B (Foco em Processamento Hibrido - Medio)
-echo [3] Void-1-3B (Foco em Decisoes Criticas - Mais Inteligente)
+echo [1] Void-1-1B (Foco em Baixa Latência - Mais Rápido)
+echo [2] Void-1-2B (Foco em Processamento Híbrido - Médio)
+echo [3] Void-1-3B (Foco em Decisões Críticas - Inteligente)
 echo ===================================================
 set /p choice="INPUT SELECTION (1/2/3): "
 
@@ -108,23 +102,23 @@ echo [*] Puxando Void.%TGT% do servidor...
 powershell -Command "Invoke-WebRequest -Uri '!RAW_URL!' -OutFile 'engine\void.brain'"
 
 :SKIP_ENGINE
-:: 6. VERIFICACAO DO MODULO DE VOZ
+:: 6. VERIFICAÇÃO DO MÓDULO DE VOZ
 if not exist "vosk-model" (
-    echo [*] Baixando modulos de audicao...
+    echo [*] Baixando módulos de audição...
     powershell -Command "Invoke-WebRequest -Uri 'https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip' -OutFile 'vosk.zip'; Expand-Archive -Path 'vosk.zip' -DestinationPath '.'; Move-Item -Path 'vosk-model-small-pt-0.3' -Destination 'vosk-model'; Remove-Item 'vosk.zip'" >nul 2>&1
 ) else (
-    echo [OK] Modulo Vosk detectado.
+    echo [OK] Módulo Vosk detectado.
 )
 
-:: 7. VERIFICACAO DA ARQUITETURA E MEMORIA
+:: 7. VERIFICAÇÃO DA ARQUITETURA E MEMÓRIA
 if not exist "engine\main.py" (
-    echo [*] Baixando Sistema Nervoso e Memorias Criptografadas...
+    echo [*] Baixando Sistema Nervoso e Memórias Criptografadas...
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/main.py' -OutFile 'engine\main.py'" >nul 2>&1
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/identity.void' -OutFile 'engine\identity.void'" >nul 2>&1
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/commands.void' -OutFile 'engine\commands.void'" >nul 2>&1
 )
 
-:: 8. GERACAO DO LAUNCHER BLINDADO (Com conserto de acentos)
+:: 8. GERAÇÃO DO LAUNCHER
 if not exist "Iniciar_Void.bat" (
     echo @echo off > Iniciar_Void.bat
     echo chcp 65001 ^>nul >> Iniciar_Void.bat
@@ -136,6 +130,6 @@ if not exist "Iniciar_Void.bat" (
 
 echo.
 echo ===================================================
-echo [OK] SISTEMA PRONTO PARA OPERACAO.
+echo [OK] SISTEMA PRONTO PARA OPERAÇÃO.
 echo ===================================================
 pause
