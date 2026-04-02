@@ -11,11 +11,11 @@ echo ===================================================
 set "PY_CMD="
 
 python --version >nul 2>&1
-if %errorlevel% equ 0 set "PY_CMD=python"
+if !errorlevel! equ 0 set "PY_CMD=python"
 
 if not defined PY_CMD (
     py --version >nul 2>&1
-    if %errorlevel% equ 0 set "PY_CMD=py"
+    if !errorlevel! equ 0 set "PY_CMD=py"
 )
 
 if not defined PY_CMD (
@@ -31,12 +31,31 @@ if not defined PY_CMD (
 
 if not defined PY_CMD (
     echo [!] Python nao localizado no sistema.
-    echo [*] Baixando e configurando automaticamente (Aguarde)...
-    winget install Python.Python.3.12 --silent --override "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0"
+    echo [*] Tentando instalacao automatica via WinGet...
+    winget install Python.Python.3.12 --silent --override "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0" >nul 2>&1
+    
+    :: PLANO B: Se o WinGet falhar, aciona o Download Direto
+    if !errorlevel! neq 0 (
+        echo [!] WinGet falhou ou nao existe neste Windows.
+        echo [*] Iniciando Protocolo de Download Direto (PowerShell)...
+        powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.2/python-3.12.2-amd64.exe' -OutFile 'python_installer.exe'" >nul 2>&1
+        
+        if exist python_installer.exe (
+            echo [*] Executando instalador silencioso...
+            start /wait python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+            del python_installer.exe
+        ) else (
+            echo [!] ERRO CRITICO: Nao foi possivel baixar o Python.
+            echo [*] Instale manualmente em python.org e marque "Add to PATH".
+            pause
+            exit
+        )
+    )
+
     echo.
     echo ===================================================
     echo [OK] PYTHON INSTALADO COM SUCESSO!
-    echo O Windows precisa de 1 segundo para processar.
+    echo O Windows precisa de alguns segundos para processar.
     echo FECHE ESTA TELA E ABRA O SETUP NOVAMENTE.
     echo ===================================================
     pause
@@ -58,7 +77,7 @@ call venv\Scripts\activate
 
 :: 3. VERIFICACAO DE BIBLIOTECAS
 python -c "import llama_cpp, vosk, pyttsx3, psutil" >nul 2>&1
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
     echo [*] Instalando dependencias pendentes...
     python -m pip install --upgrade pip >nul 2>&1
     pip install vosk pyttsx3 keyboard sounddevice scipy psutil llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu >nul 2>&1
@@ -111,7 +130,7 @@ if not exist "vosk-model" (
 
 :: 7. VERIFICACAO DA ARQUITETURA E MEMORIA
 if not exist "engine\main.py" (
-    echo [*] Baixando Sistema Nervoso e Memorias Criptografadas...
+    echo [*] Baixando Sistema e Memorias...
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/main.py' -OutFile 'engine\main.py'" >nul 2>&1
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/identity.void' -OutFile 'engine\identity.void'" >nul 2>&1
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/commands.void' -OutFile 'engine\commands.void'" >nul 2>&1
