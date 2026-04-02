@@ -1,153 +1,127 @@
 @echo off
 setlocal EnableDelayedExpansion
-title VOID ASSISTANT - SYSTEM
+title LP77 - VOID DEPLOY SYSTEM
 color 0b
 
 echo ===================================================
-echo                VOID ASSISTANT (v1.0)
+echo           SISTEMA DE INSTALACAO LP77
 echo ===================================================
 
-:: 1. CACA AO NUCLEO PYTHON
+:CHECK_PYTHON
+echo [*] Procurando motor Python no sistema...
 set "PY_CMD="
 
+:: Teste 1: Comando padrao
 python --version >nul 2>&1
-if !errorlevel! equ 0 set "PY_CMD=python"
-
-if not defined PY_CMD (
-    py --version >nul 2>&1
-    if !errorlevel! equ 0 set "PY_CMD=py"
+if !errorlevel! equ 0 (
+    set "PY_CMD=python"
+    goto PYTHON_FOUND
 )
 
-if not defined PY_CMD (
-    for /d %%i in ("%LocalAppData%\Programs\Python\Python3*") do (
-        if exist "%%i\python.exe" set "PY_CMD=%%i\python.exe"
+:: Teste 2: Launcher 'py'
+py --version >nul 2>&1
+if !errorlevel! equ 0 (
+    set "PY_CMD=py"
+    goto PYTHON_FOUND
+)
+
+:: Teste 3: Pastas Locais (AppData)
+for /d %%i in ("%LocalAppData%\Programs\Python\Python3*") do (
+    if exist "%%i\python.exe" (
+        set "PY_CMD=%%i\python.exe"
+        goto PYTHON_FOUND
     )
 )
-if not defined PY_CMD (
-    for /d %%i in ("C:\Program Files\Python3*") do (
-        if exist "%%i\python.exe" set "PY_CMD=%%i\python.exe"
-    )
+
+:INSTALL_PYTHON
+echo [!] Python nao encontrado. Iniciando Protocolos de Instalacao...
+
+:: Tentativa A: WinGet (Nativo do Windows 10/11)
+echo [*] Tentando via WinGet...
+winget install Python.Python.3.12 --silent --override "/quiet InstallAllUsers=1 PrependPath=1" >nul 2>&1
+if !errorlevel! equ 0 goto INSTALL_SUCCESS
+
+:: Tentativa B: PowerShell (Download Direto do site oficial)
+echo [*] WinGet falhou. Baixando instalador oficial via PowerShell...
+powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.2/python-3.12.2-amd64.exe' -OutFile 'py_installer.exe'" >nul 2>&1
+if exist py_installer.exe (
+    echo [*] Executando instalador...
+    start /wait py_installer.exe /quiet InstallAllUsers=1 PrependPath=1
+    del py_installer.exe
+    goto INSTALL_SUCCESS
 )
 
-if not defined PY_CMD (
-    echo [!] Python nao localizado no sistema.
-    echo [*] Tentando instalacao automatica via WinGet...
-    winget install Python.Python.3.12 --silent --override "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0" >nul 2>&1
-    
-    :: PLANO B: Se o WinGet falhar, aciona o Download Direto
-    if !errorlevel! neq 0 (
-        echo [!] WinGet falhou ou nao existe neste Windows.
-        echo [*] Iniciando Protocolo de Download Direto (PowerShell)...
-        powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.2/python-3.12.2-amd64.exe' -OutFile 'python_installer.exe'" >nul 2>&1
-        
-        if exist python_installer.exe (
-            echo [*] Executando instalador silencioso...
-            start /wait python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
-            del python_installer.exe
-        ) else (
-            echo [!] ERRO CRITICO: Nao foi possivel baixar o Python.
-            echo [*] Instale manualmente em python.org e marque "Add to PATH".
-            pause
-            exit
-        )
-    )
+echo [ERRO] Nao foi possivel instalar o Python automaticamente.
+echo Instale manualmente em python.org e marque a caixa "Add to PATH".
+pause
+exit
 
-    echo.
-    echo ===================================================
-    echo [OK] PYTHON INSTALADO COM SUCESSO!
-    echo O Windows precisa de alguns segundos para processar.
-    echo FECHE ESTA TELA E ABRA O SETUP NOVAMENTE.
-    echo ===================================================
-    pause
-    exit
-)
+:INSTALL_SUCCESS
+echo ===================================================
+echo [OK] PYTHON INJETADO! FECHE E ABRA O SETUP NOVAMENTE.
+echo ===================================================
+pause
+exit
 
-echo [OK] Motor Python localizado e validado.
+:PYTHON_FOUND
+echo [OK] Python localizado em: !PY_CMD!
 set PY_CMD=!PY_CMD:"=!
 
-:: 2. VERIFICACAO DO AMBIENTE (VENV)
-if not exist "venv" (
-    echo [*] Criando ambiente de contencao (VENV)...
-    "!PY_CMD!" -m venv venv
+:VENV_STAGE
+if exist "venv" (
+    echo [OK] Ambiente isolado (VENV) ja existe.
 ) else (
-    echo [OK] VENV detectado.
+    echo [*] Criando ambiente isolado (VENV)...
+    "!PY_CMD!" -m venv venv
 )
-
 call venv\Scripts\activate
 
-:: 3. VERIFICACAO DE BIBLIOTECAS
-python -c "import llama_cpp, vosk, pyttsx3, psutil" >nul 2>&1
-if !errorlevel! neq 0 (
-    echo [*] Instalando dependencias pendentes...
-    python -m pip install --upgrade pip >nul 2>&1
-    pip install vosk pyttsx3 keyboard sounddevice scipy psutil llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu >nul 2>&1
-) else (
-    echo [OK] Bibliotecas sincronizadas.
-)
+:LIB_STAGE
+echo [*] Sincronizando bibliotecas da IA...
+python -m pip install --upgrade pip >nul 2>&1
+pip install vosk pyttsx3 psutil llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
 
+:FILES_STAGE
 if not exist "engine" mkdir engine
+echo [*] Puxando arquivos vitais do GitHub...
 
-:: 4. VERIFICACAO DA BASE DE DADOS
-if not exist "engine.void" (
-    echo [*] Baixando mapa de motores...
-    powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine.void' -OutFile 'engine.void'" >nul 2>&1
-)
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine.void' -OutFile 'engine.void'"
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/main.py' -OutFile 'engine/main.py'"
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/identity.void' -OutFile 'engine/identity.void'"
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/commands.void' -OutFile 'engine/commands.void'"
 
-:: 5. VERIFICACAO DO MOTOR
-if exist "engine\void.brain" (
-    echo [OK] Motor ja instalado. Pulando download.
-    goto SKIP_ENGINE
-)
-
+:MODEL_STAGE
+if exist "engine\void.brain" goto VOICE_STAGE
 echo.
 echo ===================================================
-echo                SELECAO DE NUCLEO
+echo SELECIONE O MODELO (NUCLEO):
+echo [1] 1B (Leve) | [2] 2B (Medio) | [3] 3B (Inteligente)
 echo ===================================================
-echo [1] Void-1-1B (Foco em Baixa Latencia - Mais Rapido)
-echo [2] Void-1-2B (Foco em Processamento Hibrido - Medio)
-echo [3] Void-1-3B (Foco em Decisoes Criticas - Inteligente)
-echo ===================================================
-set /p choice="INPUT SELECTION (1/2/3): "
+set /p choice="Escolha: "
 
 if "%choice%"=="1" set TGT=1B
 if "%choice%"=="2" set TGT=2B
 if "%choice%"=="3" set TGT=3B
 
-echo [*] Decodificando rota segura...
+echo [*] Decodificando link e baixando motor...
 for /f "delims=" %%i in ('python -c "import json,base64; d=json.load(open('engine.void')); v=d['%TGT%'][::-1]; print(base64.b64decode(v).decode('utf-8'))"') do set RAW_URL=%%i
-
-echo [*] Puxando Void.%TGT% do servidor...
 powershell -Command "Invoke-WebRequest -Uri '!RAW_URL!' -OutFile 'engine\void.brain'"
 
-:SKIP_ENGINE
-:: 6. VERIFICACAO DO MODULO DE VOZ
-if not exist "vosk-model" (
-    echo [*] Baixando modulos de audicao...
-    powershell -Command "Invoke-WebRequest -Uri 'https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip' -OutFile 'vosk.zip'; Expand-Archive -Path 'vosk.zip' -DestinationPath '.'; Move-Item -Path 'vosk-model-small-pt-0.3' -Destination 'vosk-model'; Remove-Item 'vosk.zip'" >nul 2>&1
-) else (
-    echo [OK] Modulo Vosk detectado.
-)
+:VOICE_STAGE
+if exist "vosk-model" goto FINAL_STAGE
+echo [*] Baixando modulo de voz (Vosk)...
+powershell -Command "Invoke-WebRequest -Uri 'https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip' -OutFile 'v.zip'; Expand-Archive 'v.zip' '.'; Move-Item 'vosk-model-small-pt-0.3' 'vosk-model'; Remove-Item 'v.zip'"
 
-:: 7. VERIFICACAO DA ARQUITETURA E MEMORIA
-if not exist "engine\main.py" (
-    echo [*] Baixando Sistema e Memorias...
-    powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/main.py' -OutFile 'engine\main.py'" >nul 2>&1
-    powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/identity.void' -OutFile 'engine\identity.void'" >nul 2>&1
-    powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/commands.void' -OutFile 'engine\commands.void'" >nul 2>&1
-)
-
-:: 8. GERACAO DO LAUNCHER
+:FINAL_STAGE
 if not exist "Iniciar_Void.bat" (
     echo @echo off > Iniciar_Void.bat
     echo chcp 65001 ^>nul >> Iniciar_Void.bat
-    echo title VOID ASSISTANT - TERMINAL >> Iniciar_Void.bat
-    echo color 0c >> Iniciar_Void.bat
     echo call venv\Scripts\activate >> Iniciar_Void.bat
     echo python engine\main.py >> Iniciar_Void.bat
 )
 
 echo.
 echo ===================================================
-echo [OK] SISTEMA PRONTO PARA OPERACAO.
+echo [OK] DEPLOY CONCLUIDO. USE O 'Iniciar_Void.bat'.
 echo ===================================================
 pause
