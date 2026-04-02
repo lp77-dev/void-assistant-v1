@@ -22,19 +22,16 @@ if sys.stdin and hasattr(sys.stdin, 'reconfigure'):
     sys.stdin.reconfigure(encoding='utf-8')
 
 def get_base_path():
-    """ Retorna a pasta raiz correta, seja rodando como .py ou .exe """
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def resource_path(relative_path):
-    """ Retorna o caminho para arquivos embutidos no .exe (identity.void, etc) """
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(get_base_path(), relative_path)
 
 def decrypt_void(file_name):
-    """ Descriptografa as memórias. Se falhar, não crasha, retorna vazio ou default. """
     path = resource_path(file_name)
     if not os.path.exists(path):
         return ""
@@ -47,7 +44,6 @@ def decrypt_void(file_name):
         return f"[ERRO DE LEITURA DA MEMORIA: {e}]"
 
 def get_full_hardware_status():
-    """ Coleta dados do sistema sem chance de crashar a IA se faltar permissão """
     i = []
     i.append(f"HORARIO: {datetime.now().strftime('%H:%M:%S')}")
     i.append(f"DATA: {datetime.now().strftime('%d/%m/%Y')}")
@@ -77,7 +73,6 @@ def get_full_hardware_status():
     return " | ".join(i)
 
 def inicializar_voz():
-    """ Inicia o motor de voz prevendo falhas de SAPI5 no Windows """
     try:
         engine = pyttsx3.init()
         return engine
@@ -126,10 +121,8 @@ while True:
         status = get_full_hardware_status()
         prompt = f"{identity}\n\n{commands}\n\n[STATUS_ATUAL]: {status}\n\nUsuario: {user_input}\nVoid:"
 
-        # Geração da resposta
         response_raw = l(prompt, max_tokens=256, stop=["Usuario:", "LP77:"])['choices'][0]['text']
         
-        # Parser de Comandos (Robusto com Regex)
         fala = re.search(r'<fala>(.*?)</fala>', response_raw, re.IGNORECASE | re.DOTALL)
         exec_cmd = re.search(r'<exec>(.*?)</exec>', response_raw, re.IGNORECASE | re.DOTALL)
         danger_cmd = re.search(r'<perigo>(.*?)</perigo>', response_raw, re.IGNORECASE | re.DOTALL)
