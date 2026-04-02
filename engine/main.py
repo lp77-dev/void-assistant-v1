@@ -7,97 +7,165 @@ import platform
 import socket
 import subprocess
 from datetime import datetime
-import pyttsx3
-from llama_cpp import Llama
 
-sys.stdout.reconfigure(encoding='utf-8')
-sys.stdin.reconfigure(encoding='utf-8')
+# Tratamento de erro rigoroso para dependências de IA e Voz
+try:
+    import pyttsx3
+    from llama_cpp import Llama
+except ImportError as e:
+    print(f"[!] ERRO FATAL: Biblioteca ausente ({e}). Execute o instalador novamente.")
+    input("Pressione Enter para sair...")
+    sys.exit(1)
 
-def d(f_n):
-    if not os.path.exists(f_n):
+# Blindagem para caracteres especiais (Ç, Á, Õ) no terminal do Windows
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stdin and hasattr(sys.stdin, 'reconfigure'):
+    sys.stdin.reconfigure(encoding='utf-8')
+
+def get_base_path():
+    """ Retorna a pasta raiz correta, seja rodando como .py ou .exe """
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def resource_path(relative_path):
+    """ Retorna o caminho para arquivos embutidos no .exe (identity.void, etc) """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(get_base_path(), relative_path)
+
+def decrypt_void(file_name):
+    """ Descriptografa as memórias. Se falhar, não crasha, retorna vazio ou default. """
+    path = resource_path(file_name)
+    if not os.path.exists(path):
         return ""
     try:
-        with open(f_n, 'r', encoding='utf-8') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             h = f.read().strip()
-        return base64.b64decode(base64.b64decode(h).decode('utf-8')[::-1]).decode('utf-8')
-    except:
-        return ""
+        step1 = base64.b64decode(h).decode('utf-8')[::-1]
+        return base64.b64decode(step1).decode('utf-8')
+    except Exception as e:
+        return f"[ERRO DE LEITURA DA MEMORIA: {e}]"
 
-def get_sys_info():
+def get_full_hardware_status():
+    """ Coleta dados do sistema sem chance de crashar a IA se faltar permissão """
     i = []
-    i.append(f"DATA_HORA: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-    i.append(f"OS: {platform.system()} {platform.release()} ({platform.version()})")
-    i.append(f"CPU: {platform.processor()} | USO: {psutil.cpu_percent()}% | THREADS: {psutil.cpu_count(logical=True)}")
-    r = psutil.virtual_memory()
-    i.append(f"RAM: USO {r.percent}% | DISP {r.available // (1024**2)}MB | TOTAL {r.total // (1024**2)}MB")
-    d_ = psutil.disk_usage('C:\\')
-    i.append(f"DISCO_C: USO {d_.percent}% | LIVRE {d_.free // (1024**3)}GB")
-    i.append(f"HOSTNAME: {socket.gethostname()}")
+    i.append(f"HORARIO: {datetime.now().strftime('%H:%M:%S')}")
+    i.append(f"DATA: {datetime.now().strftime('%d/%m/%Y')}")
+    i.append(f"SISTEMA: {platform.system()} {platform.release()}")
     
     try:
-        w = subprocess.check_output('netsh wlan show interfaces', shell=True, text=True, stderr=subprocess.DEVNULL)
-        ssid = re.search(r'SSID\s*:\s(.*)', w)
-        i.append(f"WIFI: {ssid.group(1).strip() if ssid else 'LAN/Desconectado'}")
+        ram = psutil.virtual_memory()
+        i.append(f"RAM_USO: {ram.percent}% ({ram.available // (1024**2)}MB livres)")
+        i.append(f"CPU_USO: {psutil.cpu_percent()}%")
     except:
-        pass
-        
+        i.append("RAM_USO: INDISPONIVEL | CPU_USO: INDISPONIVEL")
+
     try:
-        mb = subprocess.check_output('wmic baseboard get product', shell=True, text=True, stderr=subprocess.DEVNULL).replace('Product', '').strip()
+        mb = subprocess.check_output('wmic baseboard get product', shell=True, text=True, stderr=subprocess.DEVNULL).split('\n')[1].strip()
         i.append(f"PLACA_MAE: {mb}")
-    except:
-        pass
-        
+    except: pass
+
     try:
-        gpu = subprocess.check_output('wmic path win32_videocontroller get name', shell=True, text=True, stderr=subprocess.DEVNULL).replace('Name', '').strip()
-        i.append(f"GPU: {gpu}")
-    except:
-        pass
-        
-    b = psutil.sensors_battery()
-    if b:
-        i.append(f"BATERIA: {b.percent}% | PLUGADO: {b.power_plugged}")
-        
-    return " || ".join(i)
+        gpu = subprocess.check_output('wmic path win32_videocontroller get name', shell=True, text=True, stderr=subprocess.DEVNULL).split('\n')[1].strip()
+        if gpu: i.append(f"GPU: {gpu}")
+    except: pass
 
-def p(t):
-    f = re.search(r'<fala>(.*?)</fala>', t, re.S)
-    e = re.search(r'<exec>(.*?)</exec>', t, re.S)
-    pr = re.search(r'<perigo>(.*?)</perigo>', t, re.S)
-    return {
-        "f": f.group(1).strip() if f else "",
-        "e": e.group(1).strip() if e else None,
-        "p": pr.group(1).strip() if pr else None
-    }
+    try:
+        i.append(f"IP_LOCAL: {socket.gethostbyname(socket.gethostname())}")
+    except: pass
 
-iden = d("engine/identity.void")
-cmds = d("engine/commands.void")
+    return " | ".join(i)
 
-e = pyttsx3.init()
-l = Llama(model_path="engine/void.brain", n_ctx=2048)
+def inicializar_voz():
+    """ Inicia o motor de voz prevendo falhas de SAPI5 no Windows """
+    try:
+        engine = pyttsx3.init()
+        return engine
+    except Exception as e:
+        print(f"[!] Aviso: Modulo de voz falhou ao iniciar. Executando em modo silencioso. Erro: {e}")
+        return None
 
+# ==========================================
+# BOOT SEQUENCE
+# ==========================================
 os.system('cls' if os.name == 'nt' else 'clear')
-print("[ VOID ASSISTANT ONLINE | LP77 NATIVE ]")
+print("===================================================")
+print("       LP77 ASSISTANT - NÚCLEO OPERACIONAL")
+print("===================================================")
+print("[*] Carregando memórias criptografadas...")
+
+identity = decrypt_void("engine/identity.void")
+commands = decrypt_void("engine/commands.void")
+engine_voz = inicializar_voz()
+
+# Verificação do Motor (Cérebro)
+base_dir = get_base_path()
+model_path = os.path.join(base_dir, "engine", "void.brain")
+
+if not os.path.exists(model_path):
+    print(f"\n[!] ERRO CRÍTICO: Cérebro não encontrado.")
+    print(f"[*] O arquivo 'void.brain' DEVE estar no caminho: {model_path}")
+    input("\nPressione Enter para sair...")
+    sys.exit(1)
+
+print("[*] Acordando IA (Isso pode levar alguns segundos)...")
+try:
+    l = Llama(model_path=model_path, n_ctx=2048, verbose=False)
+except Exception as e:
+    print(f"\n[!] ERRO FATAL AO CARREGAR O MODELO: {e}")
+    input("Pressione Enter para sair...")
+    sys.exit(1)
+
+print("\n[OK] SISTEMA ONLINE E PRONTO.")
+print("===================================================\n")
 
 while True:
-    c = input("\nLP77 > ")
-    if c.lower() in ['sair', 'exit', 'quit']:
+    try:
+        user_input = input("LP77 > ")
+        if not user_input.strip(): continue
+        if user_input.lower() in ['sair', 'exit', 'quit', 'desligar']: 
+            print("[*] Encerrando processos...")
+            break
+
+        status = get_full_hardware_status()
+        prompt = f"{identity}\n\n{commands}\n\n[STATUS_ATUAL]: {status}\n\nUsuario: {user_input}\nVoid:"
+
+        # Geração da resposta
+        response_raw = l(prompt, max_tokens=256, stop=["Usuario:", "LP77:"])['choices'][0]['text']
+        
+        # Parser de Comandos (Robusto com Regex)
+        fala = re.search(r'<fala>(.*?)</fala>', response_raw, re.IGNORECASE | re.DOTALL)
+        exec_cmd = re.search(r'<exec>(.*?)</exec>', response_raw, re.IGNORECASE | re.DOTALL)
+        danger_cmd = re.search(r'<perigo>(.*?)</perigo>', response_raw, re.IGNORECASE | re.DOTALL)
+
+        if fala:
+            txt = fala.group(1).strip()
+            print(f"\nVOID: {txt}\n")
+            if engine_voz:
+                engine_voz.say(txt)
+                engine_voz.runAndWait()
+        else:
+            # Fallback se a IA não usar a tag <fala> corretamente
+            clean_text = re.sub(r'<.*?>.*?</.*?>', '', response_raw).strip()
+            if clean_text:
+                print(f"\nVOID: {clean_text}\n")
+
+        if danger_cmd:
+            cmd = danger_cmd.group(1).strip()
+            print(f"[!] ALERTA DE SEGURANÇA: A IA solicitou rodar: {cmd}")
+            if input("AUTORIZAR? (s/n): ").strip().lower() == 's': 
+                os.system(cmd)
+            else:
+                print("[*] Comando bloqueado.")
+        elif exec_cmd:
+            cmd = exec_cmd.group(1).strip()
+            print(f"[*] Executando processo em background...")
+            os.system(cmd)
+
+    except KeyboardInterrupt:
+        print("\n[*] Interrupção de teclado detectada. Encerrando...")
         break
-        
-    s = get_sys_info()
-    pr = f"{iden}\n\n{cmds}\n\nSTATUS_SISTEMA: {s}\n\nUsuario: {c}\nVoid:"
-    
-    out = l(pr, max_tokens=300, stop=["Usuario:", "LP77:"])
-    r = out['choices'][0]['text']
-    x = p(r)
-    
-    if x["f"]:
-        print(f"VOID: {x['f']}")
-        e.say(x['f'])
-        e.runAndWait()
-        
-    if x["p"]:
-        print(f"\n[!] COMANDO PERIGOSO: {x['p']}")
-        if input("AUTORIZAR EXECUCAO CRITICA? (S/N): ").upper() == 'S':
-            os.system(x['p'])
-    elif x["e"]:
-        os.system(x['e'])
+    except Exception as e:
+        print(f"\n[!] ERRO INTERNO: {e}")
