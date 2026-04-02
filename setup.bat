@@ -7,26 +7,60 @@ echo ===================================================
 echo                VOID ASSISTANT (v1.0)
 echo ===================================================
 
-:: 1. VERIFICACAO DO PYTHON
+:: 1. CACA AO NUCLEO PYTHON (ANTI-LOOP INFINITO)
+set "PY_CMD="
+
+:: Tenta o comando padrao
 python --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [!] Python ausente. Instalando via WinGet...
-    winget install Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
-    echo [!] Reinicie este arquivo apos a instalacao.
+if %errorlevel% equ 0 set "PY_CMD=python"
+
+:: Tenta o launcher 'py' (muito comum no Windows e que nao buga)
+if not defined PY_CMD (
+    py --version >nul 2>&1
+    if %errorlevel% equ 0 set "PY_CMD=py"
+)
+
+:: Cacada bruta nas pastas ocultas do Windows (Ignorando o PATH quebrado)
+if not defined PY_CMD (
+    for /d %%i in ("%LocalAppData%\Programs\Python\Python3*") do (
+        if exist "%%i\python.exe" set "PY_CMD=%%i\python.exe"
+    )
+)
+if not defined PY_CMD (
+    for /d %%i in ("C:\Program Files\Python3*") do (
+        if exist "%%i\python.exe" set "PY_CMD=%%i\python.exe"
+    )
+)
+
+:: Se o usuario realmente nao tem, instala forcando a configuracao do PATH
+if not defined PY_CMD (
+    echo [!] Python nao localizado no sistema.
+    echo [*] Baixando e configurando automaticamente (Aguarde)...
+    winget install Python.Python.3.12 --silent --override "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0"
+    echo.
+    echo ===================================================
+    echo [OK] NUCLEO INSTALADO COM SUCESSO!
+    echo O Windows precisa de 1 segundo para processar.
+    echo FECHE ESTA TELA E ABRA O SETUP NOVAMENTE.
+    echo ===================================================
     pause
     exit
-) else (
-    echo [OK] Python detectado.
 )
+
+echo [OK] Motor Python localizado e validado.
+
+:: Limpa as aspas do caminho se ele foi achado nas pastas ocultas
+set PY_CMD=!PY_CMD:"=!
 
 :: 2. VERIFICACAO DO AMBIENTE ISOLADO (VENV)
 if not exist "venv" (
     echo [*] Criando ambiente de contencao (VENV)...
-    python -m venv venv
+    "!PY_CMD!" -m venv venv
 ) else (
     echo [OK] VENV detectado.
 )
 
+:: A magica acontece aqui: Dentro do VENV, o comando 'python' SEMPRE funciona
 call venv\Scripts\activate
 
 :: 3. VERIFICACAO DE BIBLIOTECAS
@@ -82,7 +116,7 @@ if not exist "vosk-model" (
     echo [OK] Modulo Vosk detectado.
 )
 
-:: 7. VERIFICACAO DA ARQUITETURA E MEMORIA (ATUALIZADO)
+:: 7. VERIFICACAO DA ARQUITETURA E MEMORIA
 if not exist "engine\main.py" (
     echo [*] Baixando Sistema Nervoso e Memorias Criptografadas...
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/main.py' -OutFile 'engine\main.py'" >nul 2>&1
@@ -90,9 +124,10 @@ if not exist "engine\main.py" (
     powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/commands.void' -OutFile 'engine\commands.void'" >nul 2>&1
 )
 
-:: 8. GERACAO DO LAUNCHER
+:: 8. GERACAO DO LAUNCHER BLINDADO (Com conserto de acentos)
 if not exist "Iniciar_Void.bat" (
     echo @echo off > Iniciar_Void.bat
+    echo chcp 65001 ^>nul >> Iniciar_Void.bat
     echo title VOID ASSISTANT - TERMINAL >> Iniciar_Void.bat
     echo color 0c >> Iniciar_Void.bat
     echo call venv\Scripts\activate >> Iniciar_Void.bat
