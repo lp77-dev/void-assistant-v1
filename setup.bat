@@ -1,127 +1,138 @@
 @echo off
-setlocal EnableDelayedExpansion
-title LP77 - VOID DEPLOY SYSTEM
-color 0b
+title LP77 - VOID IA
+set "TEMP_PS1=%~dp0temp_setup.ps1"
 
-echo ===================================================
-echo           SISTEMA DE INSTALACAO LP77
-echo ===================================================
+powershell -NoProfile -Command "Get-Content '%~f0' | Select-Object -Skip 12 | Set-Content '%TEMP_PS1%' -Encoding UTF8"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%TEMP_PS1%"
 
-:CHECK_PYTHON
-echo [*] Procurando motor Python no sistema...
-set "PY_CMD="
+if exist "%TEMP_PS1%" del "%TEMP_PS1%"
+exit /b
 
-:: Teste 1: Comando padrao
-python --version >nul 2>&1
-if !errorlevel! equ 0 (
-    set "PY_CMD=python"
-    goto PYTHON_FOUND
-)
+# ===================================================
+#        CÓDIGO POWERSHELL (NÃO ALTERAR ABAIXO)
+# ===================================================
+$Host.UI.RawUI.WindowTitle = "VOID ASSISTANT - SYSTEM"
+Clear-Host
 
-:: Teste 2: Launcher 'py'
-py --version >nul 2>&1
-if !errorlevel! equ 0 (
-    set "PY_CMD=py"
-    goto PYTHON_FOUND
-)
+Write-Host "==================================================="
+Write-Host "                VOID ASSISTANT (v1.0)"
+Write-Host "==================================================="
 
-:: Teste 3: Pastas Locais (AppData)
-for /d %%i in ("%LocalAppData%\Programs\Python\Python3*") do (
-    if exist "%%i\python.exe" (
-        set "PY_CMD=%%i\python.exe"
-        goto PYTHON_FOUND
-    )
-)
+$PY_CMD = ""
 
-:INSTALL_PYTHON
-echo [!] Python nao encontrado. Iniciando Protocolos de Instalacao...
+if (Get-Command "python" -ErrorAction SilentlyContinue) { $PY_CMD = "python" }
+elseif (Get-Command "py" -ErrorAction SilentlyContinue) { $PY_CMD = "py" }
+else {
+    $localPaths = @("$env:LOCALAPPDATA\Programs\Python", "C:\Program Files\Python")
+    foreach ($path in $localPaths) {
+        if (Test-Path $path) {
+            $found = Get-ChildItem $path -Directory | Where-Object { $_.Name -like "Python3*" } | Select-Object -First 1
+            if ($found) { $PY_CMD = Join-Path $found.FullName "python.exe" }
+        }
+    }
+}
 
-:: Tentativa A: WinGet (Nativo do Windows 10/11)
-echo [*] Tentando via WinGet...
-winget install Python.Python.3.12 --silent --override "/quiet InstallAllUsers=1 PrependPath=1" >nul 2>&1
-if !errorlevel! equ 0 goto INSTALL_SUCCESS
+if (-not $PY_CMD) {
+    Write-Host "[!] Python nao localizado no sistema."
+    Write-Host "[*] Tentando instalacao automatica via WinGet..."
+    
+    winget install Python.Python.3.12 --silent --override "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0"
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[!] WinGet falhou ou nao existe neste Windows."
+        Write-Host "[*] Iniciando Protocolo de Download Direto (PowerShell)..."
+        Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.2/python-3.12.2-amd64.exe' -OutFile 'python_installer.exe'
+        
+        if (Test-Path "python_installer.exe") {
+            Write-Host "[*] Executando instalador silencioso..."
+            Start-Process -FilePath "python_installer.exe" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0" -Wait
+            Remove-Item "python_installer.exe"
+        } else {
+            Write-Host "[!] ERRO CRITICO: Nao foi possivel baixar o Python."
+            Write-Host "[*] Instale manualmente em python.org e marque 'Add to PATH'."
+            Read-Host "Pressione Enter para sair"
+            exit
+        }
+    }
 
-:: Tentativa B: PowerShell (Download Direto do site oficial)
-echo [*] WinGet falhou. Baixando instalador oficial via PowerShell...
-powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.2/python-3.12.2-amd64.exe' -OutFile 'py_installer.exe'" >nul 2>&1
-if exist py_installer.exe (
-    echo [*] Executando instalador...
-    start /wait py_installer.exe /quiet InstallAllUsers=1 PrependPath=1
-    del py_installer.exe
-    goto INSTALL_SUCCESS
-)
+    Write-Host ""
+    Write-Host "==================================================="
+    Write-Host "[OK] PYTHON INSTALADO COM SUCESSO!"
+    Write-Host "O Windows precisa de alguns segundos para processar."
+    Write-Host "FECHE ESTA TELA E ABRA O SETUP NOVAMENTE."
+    Write-Host "==================================================="
+    Read-Host "Pressione Enter para fechar"
+    exit
+}
 
-echo [ERRO] Nao foi possivel instalar o Python automaticamente.
-echo Instale manualmente em python.org e marque a caixa "Add to PATH".
-pause
-exit
+Write-Host "[OK] Motor Python localizado e validado."
 
-:INSTALL_SUCCESS
-echo ===================================================
-echo [OK] PYTHON INJETADO! FECHE E ABRA O SETUP NOVAMENTE.
-echo ===================================================
-pause
-exit
+if (-not (Test-Path "venv")) {
+    Write-Host "[*] Criando ambiente de contencao (VENV)..."
+    & $PY_CMD -m venv venv
+} else {
+    Write-Host "[OK] VENV detectado."
+}
 
-:PYTHON_FOUND
-echo [OK] Python localizado em: !PY_CMD!
-set PY_CMD=!PY_CMD:"=!
+$python_venv = "venv\Scripts\python.exe"
+$pip_venv = "venv\Scripts\pip.exe"
 
-:VENV_STAGE
-if exist "venv" (
-    echo [OK] Ambiente isolado (VENV) ja existe.
-) else (
-    echo [*] Criando ambiente isolado (VENV)...
-    "!PY_CMD!" -m venv venv
-)
-call venv\Scripts\activate
+Write-Host "[*] Instalando dependencias pendentes..."
+& $python_venv -m pip install --upgrade pip --quiet
+& $pip_venv install vosk pyttsx3 keyboard sounddevice scipy psutil llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu --quiet
+Write-Host "[OK] Bibliotecas sincronizadas."
 
-:LIB_STAGE
-echo [*] Sincronizando bibliotecas da IA...
-python -m pip install --upgrade pip >nul 2>&1
-pip install vosk pyttsx3 psutil llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+if (-not (Test-Path "engine")) { New-Item -ItemType Directory -Path "engine" | Out-Null }
 
-:FILES_STAGE
-if not exist "engine" mkdir engine
-echo [*] Puxando arquivos vitais do GitHub...
+if (-not (Test-Path "engine.void")) {
+    Write-Host "[*] Baixando mapa de motores..."
+    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine.void' -OutFile 'engine.void'
+}
 
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine.void' -OutFile 'engine.void'"
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/main.py' -OutFile 'engine/main.py'"
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/identity.void' -OutFile 'engine/identity.void'"
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/commands.void' -OutFile 'engine/commands.void'"
+if (Test-Path "engine\void.brain") {
+    Write-Host "[OK] Motor ja instalado. Pulando download."
+} else {
+    Write-Host "`n==================================================="
+    Write-Host "                SELECAO DE NUCLEO"
+    Write-Host "==================================================="
+    Write-Host "[1] Void-1-1B (Foco em Baixa Latencia - Mais Rapido)"
+    Write-Host "[2] Void-1-2B (Foco em Processamento Hibrido - Medio)"
+    Write-Host "[3] Void-1-3B (Foco em Decisoes Criticas - Inteligente)"
+    Write-Host "==================================================="
+    $choice = Read-Host "INPUT SELECTION (1/2/3)"
 
-:MODEL_STAGE
-if exist "engine\void.brain" goto VOICE_STAGE
-echo.
-echo ===================================================
-echo SELECIONE O MODELO (NUCLEO):
-echo [1] 1B (Leve) | [2] 2B (Medio) | [3] 3B (Inteligente)
-echo ===================================================
-set /p choice="Escolha: "
+    if ($choice -eq "1") { $TGT = "1B" }
+    elseif ($choice -eq "2") { $TGT = "2B" }
+    else { $TGT = "3B" }
 
-if "%choice%"=="1" set TGT=1B
-if "%choice%"=="2" set TGT=2B
-if "%choice%"=="3" set TGT=3B
+    Write-Host "[*] Decodificando rota segura..."
+    $RAW_URL = & $python_venv -c "import json,base64; d=json.load(open('engine.void')); v=d['$TGT'][::-1]; print(base64.b64decode(v).decode('utf-8'))"
 
-echo [*] Decodificando link e baixando motor...
-for /f "delims=" %%i in ('python -c "import json,base64; d=json.load(open('engine.void')); v=d['%TGT%'][::-1]; print(base64.b64decode(v).decode('utf-8'))"') do set RAW_URL=%%i
-powershell -Command "Invoke-WebRequest -Uri '!RAW_URL!' -OutFile 'engine\void.brain'"
+    Write-Host "[*] Puxando Void.$TGT do servidor..."
+    Invoke-WebRequest -Uri $RAW_URL -OutFile 'engine\void.brain'
+}
 
-:VOICE_STAGE
-if exist "vosk-model" goto FINAL_STAGE
-echo [*] Baixando modulo de voz (Vosk)...
-powershell -Command "Invoke-WebRequest -Uri 'https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip' -OutFile 'v.zip'; Expand-Archive 'v.zip' '.'; Move-Item 'vosk-model-small-pt-0.3' 'vosk-model'; Remove-Item 'v.zip'"
+if (-not (Test-Path "vosk-model")) {
+    Write-Host "[*] Baixando modulos de audicao..."
+    Invoke-WebRequest -Uri 'https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip' -OutFile 'vosk.zip'
+    Expand-Archive -Path 'vosk.zip' -DestinationPath '.'
+    Move-Item -Path 'vosk-model-small-pt-0.3' -Destination 'vosk-model'
+    Remove-Item 'vosk.zip'
+}
 
-:FINAL_STAGE
-if not exist "Iniciar_Void.bat" (
-    echo @echo off > Iniciar_Void.bat
-    echo chcp 65001 ^>nul >> Iniciar_Void.bat
-    echo call venv\Scripts\activate >> Iniciar_Void.bat
-    echo python engine\main.py >> Iniciar_Void.bat
-)
+if (-not (Test-Path "engine\main.py")) {
+    Write-Host "[*] Baixando Sistema e Memorias..."
+    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/main.py' -OutFile 'engine\main.py'
+    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/identity.void' -OutFile 'engine\identity.void'
+    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/lp77-dev/void-assistant-v1/main/engine/commands.void' -OutFile 'engine\commands.void'
+}
 
-echo.
-echo ===================================================
-echo [OK] DEPLOY CONCLUIDO. USE O 'Iniciar_Void.bat'.
-echo ===================================================
-pause
+if (-not (Test-Path "Iniciar_Void.bat")) {
+    $launcher = "@echo off`r`nchcp 65001 >nul`r`ntitle VOID ASSISTANT - TERMINAL`r`ncolor 0c`r`ncall venv\Scripts\activate`r`npython engine\main.py"
+    Set-Content -Path "Iniciar_Void.bat" -Value $launcher
+}
+
+Write-Host "`n==================================================="
+Write-Host "[OK] SISTEMA PRONTO PARA OPERACAO."
+Write-Host "==================================================="
+Read-Host "Pressione Enter para fechar"
