@@ -1,0 +1,42 @@
+================================================================================
+TERMOS DE USO E LICENÇA DO SOFTWARE
+SOFTWARE LICENSE AND TERMS OF USE
+================================================================================
+
+[PORTUGUÊS]
+Copyright (c) 2026 LP77. Todos os direitos reservados.
+
+1. PROPRIEDADE: O software "Void Assistant", incluindo códigos, scripts (engine/main.py), 
+arquivos de configuração e identidade visual, é propriedade exclusiva da LP77.
+2. USO PERMITIDO: É concedida permissão para uso pessoal e privado do software.
+3. PROIBIÇÕES: É estritamente PROIBIDO:
+   a) Copiar, redistribuir ou sublicenciar o código-fonte ou binários (.exe).
+   b) Modificar, descompilar ou realizar engenharia reversa do software.
+   c) Utilizar o software ou qualquer parte dele para fins comerciais sem 
+      autorização expressa por escrito da LP77.
+4. ISENÇÃO DE RESPONSABILIDADE: O software é fornecido "como está", sem garantias 
+de qualquer tipo. O desenvolvedor (LP77) não se responsabiliza por quaisquer danos, 
+perda de dados ou mau funcionamento decorrente do uso deste software.
+5. TERCEIROS: Este projeto utiliza modelos de terceiros que possuem 
+seus próprios termos de uso, os quais devem ser respeitados pelo usuário final.
+
+--------------------------------------------------------------------------------
+
+[ENGLISH]
+Copyright (c) 2026 LP77. All rights reserved.
+
+1. OWNERSHIP: The "Void Assistant" software, including code, scripts (engine/main.py), 
+configuration files, and visual identity, is the exclusive property of LP77.
+2. PERMITTED USE: Permission is granted for personal and private use of the software.
+3. PROHIBITIONS: It is strictly PROHIBITED to:
+   a) Copy, redistribute, or sublicense the source code or binaries (.exe).
+   b) Modify, decompile, or reverse-engineer the software.
+   c) Use the software or any part of it for commercial purposes without 
+      express written authorization from LP77.
+4. DISCLAIMER: The software is provided "as is", without warranties of any kind. 
+The developer (LP77) shall not be liable for any damages, data loss, or 
+malfunctions arising from the use of this software.
+5. THIRD PARTIES: This project utilizes third-party models which 
+carry their own terms of use, which must be respected by the end-user.
+
+================================================================================

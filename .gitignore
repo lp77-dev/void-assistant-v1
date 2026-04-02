@@ -1,0 +1,11 @@
+venv/
+.env
+
+*.gguf
+vosk-model-*/
+vosk.zip
+
+__pycache__/
+build/
+dist/
+*.spec
